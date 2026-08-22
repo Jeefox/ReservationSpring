@@ -204,5 +204,78 @@ class ReservationServiceTest {
         verify(reservationRepository).save(any());
     }
 
+    @Test
+    void updateReservation_sameReservationNoConflict() {
+
+        CreateReservationRequest request = new CreateReservationRequest(
+                1L, 2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
+                ReservationStatus.PENDING
+        );
+
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+        Reservation reservation = Reservation.builder()
+                .id(10L)
+                .user(user)
+                .room(room)
+                .status(ReservationStatus.PENDING)
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(3))
+                .build();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(roomRepository.findById(2L)).thenReturn(Optional.of(room));
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+
+        when(reservationRepository.findConflictingReservations(
+                2L, request.startDate(), request.endDate(),
+                ReservationStatus.CANCELLED, 10L))
+                .thenReturn(List.of());  // ← просто пустой список, без Optional!
+
+        reservationService.updateReservation(10L, request);
+
+        verify(reservationRepository).findConflictingReservations(
+                eq(2L), any(), any(), eq(ReservationStatus.CANCELLED), eq(10L));
+    }
+
+    @Test
+    void updateReservation_conflictWithOver(){
+        CreateReservationRequest request = new CreateReservationRequest(
+                3L, 4L, LocalDate.now().plusDays(2), LocalDate.now().plusDays(4),
+                ReservationStatus.PENDING
+        );
+
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+        Reservation reservation = Reservation.builder()
+                .id(10L)
+                .user(user)
+                .room(room)
+                .status(ReservationStatus.PENDING)
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(3))
+                .build();
+
+        User newUser = User.builder().id(3L).name("NewUser").email("new@email.com").build();
+        Room newRoom = Room.builder().id(4L).name("newRoom").capacity(3).build();
+
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(newUser));
+        when(roomRepository.findById(4L)).thenReturn(Optional.of(newRoom));
+
+        User otherUser = User.builder().id(99L).name("Other").email("other@email.com").build();
+        Reservation conflicting = Reservation.builder()
+                .id(5L).user(otherUser).room(newRoom)
+                .startDate(LocalDate.now().plusDays(2))
+                .endDate(LocalDate.now().plusDays(5))
+                .status(ReservationStatus.PENDING)
+                .build();
+
+        when(reservationRepository.findConflictingReservations(
+                4L, request.startDate(), request.endDate(),
+                ReservationStatus.CANCELLED, 10L)).thenReturn(List.of(conflicting));
+
+        assertThrows(RoomAlreadyBookedException.class, ()-> reservationService.updateReservation(10L, request));
+    }
 
 }
