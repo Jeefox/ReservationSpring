@@ -1,9 +1,7 @@
 package school.grevcev.reservation.controller;
 
 import jakarta.validation.Valid;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,6 +9,7 @@ import school.grevcev.reservation.ReservationStatus;
 import school.grevcev.reservation.dto.CreateReservationRequest;
 import school.grevcev.reservation.dto.PageResponse;
 import school.grevcev.reservation.dto.ReservationResponse;
+import school.grevcev.reservation.dto.UpdateReservationRequest;
 import school.grevcev.reservation.service.ReservationService;
 
 import java.time.LocalDate;
@@ -25,11 +24,6 @@ public class ReservationController {
         this.reservationService = reservationService;
     }
 
-//    @GetMapping
-//    public Page<ReservationResponse> getAllReservations(@PageableDefault(size = 10, sort = "startDate") Pageable pageable) {
-//        return reservationService.getAll(pageable);
-//    }
-    
     @PostMapping
     public ResponseEntity<ReservationResponse> createReservation(@Valid @RequestBody CreateReservationRequest createReservationRequest) {
         ReservationResponse reservationResponse = reservationService.createReservation(createReservationRequest);
@@ -42,7 +36,7 @@ public class ReservationController {
     }
 
     @PutMapping("/{id}")
-    public ReservationResponse updateReservation(@PathVariable Long id, @Valid @RequestBody CreateReservationRequest reservation) {
+    public ReservationResponse updateReservation(@PathVariable Long id, @Valid @RequestBody UpdateReservationRequest reservation) {
         return reservationService.updateReservation(id, reservation);
     }
 

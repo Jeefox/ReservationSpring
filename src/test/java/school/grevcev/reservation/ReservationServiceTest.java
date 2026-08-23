@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import school.grevcev.reservation.dto.CreateReservationRequest;
 import school.grevcev.reservation.dto.ReservationResponse;
+import school.grevcev.reservation.dto.UpdateReservationRequest;
 import school.grevcev.reservation.exception.ReservationNotFoundException;
 import school.grevcev.reservation.exception.RoomAlreadyBookedException;
 import school.grevcev.reservation.exception.RoomNotFoundException;
@@ -140,7 +141,7 @@ class ReservationServiceTest {
 
         assertThrows(ReservationNotFoundException.class, ()-> reservationService.deleteReservationById(999L));
 
-        verify(reservationRepository, never()).delete(any());
+        verify(reservationRepository, never()).delete(any(Reservation.class));
     }
 
     @Test
@@ -207,7 +208,7 @@ class ReservationServiceTest {
     @Test
     void updateReservation_sameReservationNoConflict() {
 
-        CreateReservationRequest request = new CreateReservationRequest(
+        UpdateReservationRequest request = new UpdateReservationRequest(
                 1L, 2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
                 ReservationStatus.PENDING
         );
@@ -240,7 +241,7 @@ class ReservationServiceTest {
 
     @Test
     void updateReservation_conflictWithOver(){
-        CreateReservationRequest request = new CreateReservationRequest(
+        UpdateReservationRequest request = new UpdateReservationRequest(
                 3L, 4L, LocalDate.now().plusDays(2), LocalDate.now().plusDays(4),
                 ReservationStatus.PENDING
         );

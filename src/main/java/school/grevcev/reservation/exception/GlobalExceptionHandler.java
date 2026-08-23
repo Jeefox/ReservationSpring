@@ -1,40 +1,91 @@
 package school.grevcev.reservation.exception;
 
-import org.springframework.http.HttpStatus;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiError> handleUnexpected(Exception ex) {
+        log.error("Unexpected error", ex);
+        return ResponseEntity.status(500)
+                .body(new ApiError(500, "Internal server error", LocalDateTime.now(), null));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity handleValidationErrors(MethodArgumentNotValidException exception) {
-        Map<String, String> errors = new HashMap<>();
-        exception.getBindingResult().getFieldErrors().stream().forEach((fieldError) -> {errors.put(fieldError.getField(), fieldError.getDefaultMessage());});
-        return ResponseEntity.status(400).body(errors);
+    public ResponseEntity<ApiError> handleValidationErrors(MethodArgumentNotValidException exception) {
+        Map<String, String> details = new HashMap<>();
+        exception.getBindingResult().getFieldErrors()
+                .forEach(e -> details.put(e.getField(), e.getDefaultMessage()));
+        return ResponseEntity.badRequest()
+                .body(new ApiError(400, "Validation failed", LocalDateTime.now(), details));
     }
     
     @ExceptionHandler(ReservationNotFoundException.class)
-    public ResponseEntity<Object> handleReservationNotFound() {
-        return ResponseEntity.notFound().build();
+    public ResponseEntity<ApiError> handleReservationNotFound(ReservationNotFoundException ex) {
+        return ResponseEntity.status(404)
+                .body(new ApiError(404, ex.getMessage(), LocalDateTime.now(), null));
     }
 
     @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<Object> handleUserNotFound() {
-        return ResponseEntity.notFound().build();
+    public ResponseEntity<ApiError> handleUserNotFound(UserNotFoundException ex) {
+        return ResponseEntity.status(404)
+                .body(new ApiError(404, ex.getMessage(), LocalDateTime.now(), null));
     }
 
     @ExceptionHandler(RoomNotFoundException.class)
-    public ResponseEntity<Object> handleRoomNotFound() {
-        return ResponseEntity.notFound().build();
+    public ResponseEntity<ApiError> handleRoomNotFound(RoomNotFoundException ex) {
+        return ResponseEntity.status(404)
+                .body(new ApiError(404, ex.getMessage(), LocalDateTime.now(), null));
     }
 
     @ExceptionHandler(RoomAlreadyBookedException.class)
-    public ResponseEntity<Object> handleRoomAlreadyBooked(RoomAlreadyBookedException exception) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(exception.getMessage());
+    public ResponseEntity<ApiError> handleRoomAlreadyBooked(RoomAlreadyBookedException exception) {
+        return ResponseEntity.status(409)
+                .body(new ApiError(409, "Room already booked", LocalDateTime.now(), null));
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiError> handleHttpMessageNotReadableException(HttpMessageNotReadableException exception) {
+        return ResponseEntity.status(400)
+                .body(new ApiError(400, "Malformed JSON request", LocalDateTime.now(), null));
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiError> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        return ResponseEntity.status(400)
+                .body(new ApiError(400, "Invalid parameter type", LocalDateTime.now(), null));
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ApiError> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException exception) {
+        return ResponseEntity.status(405)
+                .body(new ApiError(405, "Method not allowed", LocalDateTime.now(), null));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        return ResponseEntity.status(409)
+                .body(new ApiError(409, "Data conflict: resource already exists", LocalDateTime.now(), null));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResource(NoResourceFoundException ex) {
+        return ResponseEntity.status(404)
+                .body(new ApiError(404, "Resource not found", LocalDateTime.now(), null));
     }
 }

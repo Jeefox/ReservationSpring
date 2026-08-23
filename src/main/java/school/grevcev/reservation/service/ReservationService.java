@@ -2,13 +2,13 @@ package school.grevcev.reservation.service;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.PredicateSpecification;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import school.grevcev.reservation.ReservationStatus;
 import school.grevcev.reservation.dto.CreateReservationRequest;
 import school.grevcev.reservation.dto.ReservationResponse;
+import school.grevcev.reservation.dto.UpdateReservationRequest;
 import school.grevcev.reservation.exception.ReservationNotFoundException;
 import school.grevcev.reservation.exception.RoomAlreadyBookedException;
 import school.grevcev.reservation.exception.RoomNotFoundException;
@@ -46,7 +46,7 @@ public class ReservationService {
 
     @Transactional(readOnly = true)
     public Page<ReservationResponse> getAll(Pageable pageable){
-    return reservationRepository.findAll(pageable).map(this::toResponse);
+        return reservationRepository.findAll(pageable).map(this::toResponse);
     }
 
     @Transactional
@@ -84,7 +84,7 @@ public class ReservationService {
     }
 
     @Transactional
-    public ReservationResponse updateReservation(Long id, CreateReservationRequest request) {
+    public ReservationResponse updateReservation(Long id, UpdateReservationRequest request) {
         Reservation foundReservation = reservationRepository.findById(id).orElseThrow(()-> new ReservationNotFoundException(id));
         User user = userRepository.findById(request.userId()).orElseThrow(()-> new UserNotFoundException(request.userId()));
         Room room = roomRepository.findById(request.roomId()).orElseThrow(()-> new RoomNotFoundException(request.roomId()));
