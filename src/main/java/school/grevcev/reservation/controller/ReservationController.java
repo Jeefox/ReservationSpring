@@ -1,14 +1,19 @@
 package school.grevcev.reservation.controller;
 
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import school.grevcev.reservation.ReservationStatus;
 import school.grevcev.reservation.dto.CreateReservationRequest;
+import school.grevcev.reservation.dto.PageResponse;
 import school.grevcev.reservation.dto.ReservationResponse;
 import school.grevcev.reservation.service.ReservationService;
 
-import java.util.List;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("api/v1/reservations")
@@ -20,10 +25,10 @@ public class ReservationController {
         this.reservationService = reservationService;
     }
 
-    @GetMapping
-    public List<ReservationResponse> getAllReservations() {
-        return reservationService.getAll();
-    }
+//    @GetMapping
+//    public Page<ReservationResponse> getAllReservations(@PageableDefault(size = 10, sort = "startDate") Pageable pageable) {
+//        return reservationService.getAll(pageable);
+//    }
     
     @PostMapping
     public ResponseEntity<ReservationResponse> createReservation(@Valid @RequestBody CreateReservationRequest createReservationRequest) {
@@ -45,5 +50,17 @@ public class ReservationController {
     public ResponseEntity<Void> deleteReservationById(@PathVariable Long id) {
         reservationService.deleteReservationById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping
+    public PageResponse<ReservationResponse> searchReservations(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long roomId,
+            @RequestParam(required = false) ReservationStatus status,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to,
+            Pageable pageable
+            ) {
+        return PageResponse.from(reservationService.search(userId, roomId, status, from, to, pageable));
     }
 }

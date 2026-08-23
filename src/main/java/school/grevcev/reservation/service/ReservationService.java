@@ -1,5 +1,9 @@
 package school.grevcev.reservation.service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.PredicateSpecification;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import school.grevcev.reservation.ReservationStatus;
@@ -10,12 +14,15 @@ import school.grevcev.reservation.exception.RoomAlreadyBookedException;
 import school.grevcev.reservation.exception.RoomNotFoundException;
 import school.grevcev.reservation.exception.UserNotFoundException;
 import school.grevcev.reservation.model.Reservation;
+import school.grevcev.reservation.model.ReservationSpecifications;
 import school.grevcev.reservation.model.Room;
 import school.grevcev.reservation.model.User;
 import school.grevcev.reservation.repository.ReservationRepository;
 import school.grevcev.reservation.repository.RoomRepository;
 import school.grevcev.reservation.repository.UserRepository;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -38,9 +45,8 @@ public class ReservationService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReservationResponse> getAll(){
-        List<Reservation> reservations = reservationRepository.findAllWithAssociations();
-    return reservations.stream().map(this::toResponse).toList();
+    public Page<ReservationResponse> getAll(Pageable pageable){
+    return reservationRepository.findAll(pageable).map(this::toResponse);
     }
 
     @Transactional
@@ -101,5 +107,16 @@ public class ReservationService {
     public void deleteReservationById(Long id) {
         Reservation foundReservation = reservationRepository.findById(id).orElseThrow(()-> new ReservationNotFoundException(id));
         reservationRepository.delete(foundReservation);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ReservationResponse> search(Long userId, Long roomId, ReservationStatus status, LocalDate from, LocalDate to, Pageable pageable){
+        List<Specification<Reservation>> specifications = new ArrayList<>();
+        if(userId != null) specifications.add(ReservationSpecifications.hasUserId(userId));
+        if(roomId != null) specifications.add(ReservationSpecifications.hasRoomId(roomId));
+        if(status != null) specifications.add(ReservationSpecifications.hasStatus(status));
+        if (from != null && to != null) specifications.add(ReservationSpecifications.overlapsWith(from, to));
+
+        return  reservationRepository.findAll(Specification.allOf(specifications), pageable).map(this::toResponse);
     }
 }
