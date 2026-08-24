@@ -1,13 +1,14 @@
 package school.grevcev.reservation.dbSeeder;
 
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import school.grevcev.reservation.model.Room;
 import school.grevcev.reservation.model.User;
 import school.grevcev.reservation.repository.RoomRepository;
 import school.grevcev.reservation.repository.UserRepository;
 
-//@Profile("dev")
+@Profile("dev")
 @Component
 public class DataSeeder implements CommandLineRunner {
     private UserRepository userRepository;
