@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import school.grevcev.reservation.dto.CreateRoomRequest;
 import school.grevcev.reservation.dto.RoomResponse;
+import school.grevcev.reservation.dto.UpdateRoomRequest;
 import school.grevcev.reservation.exception.RoomNotFoundException;
 import school.grevcev.reservation.model.Room;
 import school.grevcev.reservation.repository.RoomRepository;
@@ -39,5 +40,19 @@ public class RoomService {
 
     private RoomResponse toResponse(Room room) {
         return new RoomResponse(room.getId(), room.getName(), room.getCapacity());
+    }
+
+    @Transactional
+    public RoomResponse update(Long id, UpdateRoomRequest request) {
+        Room room = roomRepository.findById(id).orElseThrow(()-> new RoomNotFoundException(id));
+        room.setName(request.name());
+        room.setCapacity(request.capacity());
+        return toResponse(room);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        Room room = roomRepository.findById(id).orElseThrow(()-> new RoomNotFoundException(id));
+        roomRepository.delete(room);
     }
 }

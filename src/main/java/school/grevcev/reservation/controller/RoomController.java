@@ -6,9 +6,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import school.grevcev.reservation.dto.CreateRoomRequest;
-import school.grevcev.reservation.dto.PageResponse;
-import school.grevcev.reservation.dto.RoomResponse;
+import school.grevcev.reservation.dto.*;
 import school.grevcev.reservation.service.RoomService;
 
 @RestController
@@ -35,5 +33,16 @@ public class RoomController {
     public ResponseEntity<RoomResponse> createRoom(@Valid @RequestBody CreateRoomRequest request){
         RoomResponse created = roomService.save(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PutMapping("/{id}")
+    public RoomResponse updateRoom(@PathVariable Long id, @Valid @RequestBody UpdateRoomRequest request){
+        return roomService.update(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteRoom(@PathVariable Long id){
+        roomService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

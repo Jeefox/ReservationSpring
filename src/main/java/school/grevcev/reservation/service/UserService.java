@@ -4,9 +4,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import school.grevcev.reservation.dto.CreateUserRequest;
-import school.grevcev.reservation.dto.UserResponse;
+import school.grevcev.reservation.dto.*;
+import school.grevcev.reservation.exception.RoomNotFoundException;
 import school.grevcev.reservation.exception.UserNotFoundException;
+import school.grevcev.reservation.model.Room;
 import school.grevcev.reservation.model.User;
 import school.grevcev.reservation.repository.UserRepository;
 
@@ -40,5 +41,19 @@ public class UserService {
 
     private UserResponse toResponse(User user){
         return new UserResponse(user.getId(),  user.getName(), user.getEmail());
+    }
+
+    @Transactional
+    public UserResponse update(Long id, UpdateUserRequest request) {
+        User user = userRepository.findById(id).orElseThrow(()-> new UserNotFoundException(id));
+        user.setName(request.name());
+        user.setEmail(request.email());
+        return toResponse(user);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        User user = userRepository.findById(id).orElseThrow(()-> new UserNotFoundException(id));
+        userRepository.delete(user);
     }
 }

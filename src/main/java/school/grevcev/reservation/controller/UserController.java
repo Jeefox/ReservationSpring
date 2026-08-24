@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import school.grevcev.reservation.dto.CreateUserRequest;
 import school.grevcev.reservation.dto.PageResponse;
+import school.grevcev.reservation.dto.UpdateUserRequest;
 import school.grevcev.reservation.dto.UserResponse;
 import school.grevcev.reservation.service.UserService;
 
@@ -36,5 +37,16 @@ public class UserController {
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request){
         UserResponse created = userService.save(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PutMapping("/{id}")
+    public UserResponse updateUser(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest request){
+        return userService.update(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id){
+        userService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

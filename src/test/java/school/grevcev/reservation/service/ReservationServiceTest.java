@@ -1,4 +1,4 @@
-package school.grevcev.reservation;
+package school.grevcev.reservation.service;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -6,6 +6,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import school.grevcev.reservation.ReservationStatus;
 import school.grevcev.reservation.dto.CreateReservationRequest;
 import school.grevcev.reservation.dto.ReservationResponse;
 import school.grevcev.reservation.dto.UpdateReservationRequest;
@@ -19,7 +20,6 @@ import school.grevcev.reservation.model.User;
 import school.grevcev.reservation.repository.ReservationRepository;
 import school.grevcev.reservation.repository.RoomRepository;
 import school.grevcev.reservation.repository.UserRepository;
-import school.grevcev.reservation.service.ReservationService;
 
 import java.time.LocalDate;
 import java.util.List;
