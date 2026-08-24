@@ -1,14 +1,15 @@
 package school.grevcev.reservation.controller;
 
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import school.grevcev.reservation.dto.CreateRoomRequest;
+import school.grevcev.reservation.dto.PageResponse;
 import school.grevcev.reservation.dto.RoomResponse;
 import school.grevcev.reservation.service.RoomService;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("api/v1/rooms")
@@ -26,8 +27,8 @@ public class RoomController {
     }
 
     @GetMapping
-    public List<RoomResponse> getRooms(){
-        return roomService.findAll();
+    public PageResponse<RoomResponse> getRooms(@PageableDefault(size = 20, sort = "name") Pageable pageable){
+        return PageResponse.from(roomService.findAll(pageable));
     }
 
     @PostMapping

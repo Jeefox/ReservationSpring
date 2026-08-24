@@ -1,5 +1,7 @@
 package school.grevcev.reservation.service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import school.grevcev.reservation.dto.CreateUserRequest;
@@ -7,8 +9,6 @@ import school.grevcev.reservation.dto.UserResponse;
 import school.grevcev.reservation.exception.UserNotFoundException;
 import school.grevcev.reservation.model.User;
 import school.grevcev.reservation.repository.UserRepository;
-
-import java.util.List;
 
 @Service
 public class UserService {
@@ -20,8 +20,8 @@ public class UserService {
     }
 
     @Transactional(readOnly=true)
-    public List<UserResponse> findAll() {
-        return userRepository.findAll().stream().map(this::toResponse).toList();
+    public Page<UserResponse> findAll(Pageable pageable) {
+        return userRepository.findAll(pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly=true)

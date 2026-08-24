@@ -8,10 +8,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import school.grevcev.reservation.dto.CreateReservationRequest;
 import school.grevcev.reservation.dto.ReservationResponse;
 import school.grevcev.reservation.dto.UpdateReservationRequest;
-import school.grevcev.reservation.exception.ReservationNotFoundException;
-import school.grevcev.reservation.exception.RoomAlreadyBookedException;
-import school.grevcev.reservation.exception.RoomNotFoundException;
-import school.grevcev.reservation.exception.UserNotFoundException;
+import school.grevcev.reservation.dto.UpdateStatusRequest;
+import school.grevcev.reservation.exception.*;
 import school.grevcev.reservation.model.Reservation;
 import school.grevcev.reservation.model.Room;
 import school.grevcev.reservation.model.User;
@@ -279,4 +277,89 @@ class ReservationServiceTest {
         assertThrows(RoomAlreadyBookedException.class, ()-> reservationService.updateReservation(10L, request));
     }
 
+    @Test
+    void changeStatus_pendingToApproved_success(){
+        UpdateStatusRequest request = new UpdateStatusRequest(ReservationStatus.APPROVED);
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+
+        Reservation reservation =  Reservation.builder()
+                .id(1L)
+                .user(user)
+                .room(room)
+                .status(ReservationStatus.PENDING)
+                .build();
+
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+
+        ReservationResponse response = reservationService.changeStatus(1L, request);
+
+        assertEquals(ReservationStatus.APPROVED, reservation.getStatus());
+        assertEquals(ReservationStatus.APPROVED, response.status());
+        assertEquals(1L, response.id());
+    }
+
+    @Test
+    void changeStatus_pendingToCancelled_success(){
+        UpdateStatusRequest request = new UpdateStatusRequest(ReservationStatus.CANCELLED);
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+
+        Reservation reservation =  Reservation.builder()
+                .id(1L)
+                .user(user)
+                .room(room)
+                .status(ReservationStatus.PENDING)
+                .build();
+
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+
+        ReservationResponse response = reservationService.changeStatus(1L, request);
+
+        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
+        assertEquals(ReservationStatus.CANCELLED, response.status());
+        assertEquals(1L, response.id());
+    }
+
+    @Test
+    void changeStatus_approvedToCancelled_success(){
+        UpdateStatusRequest request = new UpdateStatusRequest(ReservationStatus.CANCELLED);
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+
+        Reservation reservation =  Reservation.builder()
+                .id(1L)
+                .user(user)
+                .room(room)
+                .status(ReservationStatus.APPROVED)
+                .build();
+
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+
+        ReservationResponse response = reservationService.changeStatus(1L, request);
+
+        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
+        assertEquals(ReservationStatus.CANCELLED, response.status());
+        assertEquals(1L, response.id());
+    }
+
+    @Test
+    void changeStatus_cancelledToApproved_throws(){
+        UpdateStatusRequest request = new UpdateStatusRequest(ReservationStatus.APPROVED);
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+
+        Reservation reservation =  Reservation.builder()
+                .id(1L)
+                .user(user)
+                .room(room)
+                .status(ReservationStatus.CANCELLED)
+                .build();
+
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+
+        assertThrows(InvalidStatusTransitionException.class, ()-> reservationService.changeStatus(1L, request));
+
+        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
+    }
 }

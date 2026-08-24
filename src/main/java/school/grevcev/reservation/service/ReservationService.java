@@ -1,5 +1,6 @@
 package school.grevcev.reservation.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -9,10 +10,8 @@ import school.grevcev.reservation.ReservationStatus;
 import school.grevcev.reservation.dto.CreateReservationRequest;
 import school.grevcev.reservation.dto.ReservationResponse;
 import school.grevcev.reservation.dto.UpdateReservationRequest;
-import school.grevcev.reservation.exception.ReservationNotFoundException;
-import school.grevcev.reservation.exception.RoomAlreadyBookedException;
-import school.grevcev.reservation.exception.RoomNotFoundException;
-import school.grevcev.reservation.exception.UserNotFoundException;
+import school.grevcev.reservation.dto.UpdateStatusRequest;
+import school.grevcev.reservation.exception.*;
 import school.grevcev.reservation.model.Reservation;
 import school.grevcev.reservation.model.ReservationSpecifications;
 import school.grevcev.reservation.model.Room;
@@ -25,6 +24,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 public class ReservationService {
 
@@ -118,5 +118,18 @@ public class ReservationService {
         if (from != null && to != null) specifications.add(ReservationSpecifications.overlapsWith(from, to));
 
         return  reservationRepository.findAll(Specification.allOf(specifications), pageable).map(this::toResponse);
+    }
+
+    @Transactional
+    public ReservationResponse changeStatus(Long id, UpdateStatusRequest request) {
+        Reservation reservation = reservationRepository.findById(id).orElseThrow(()-> new ReservationNotFoundException(id));
+
+        ReservationStatus currentStatus = reservation.getStatus();
+        if(!currentStatus.canTransitionTo(request.status())) {
+            throw new InvalidStatusTransitionException(currentStatus, request.status());
+        }
+            reservation.setStatus(request.status());
+            log.info("Reservation {} status changed: {} -> {}", id, currentStatus, request.status());
+            return toResponse(reservation);
     }
 }

@@ -1,5 +1,7 @@
 package school.grevcev.reservation.service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import school.grevcev.reservation.dto.CreateRoomRequest;
@@ -7,8 +9,6 @@ import school.grevcev.reservation.dto.RoomResponse;
 import school.grevcev.reservation.exception.RoomNotFoundException;
 import school.grevcev.reservation.model.Room;
 import school.grevcev.reservation.repository.RoomRepository;
-
-import java.util.List;
 
 @Service
 public class RoomService {
@@ -19,8 +19,8 @@ public class RoomService {
         this.roomRepository = roomRepository;
     }
     @Transactional(readOnly=true)
-    public List<RoomResponse> findAll() {
-        return roomRepository.findAll().stream().map(this::toResponse).toList();
+    public Page<RoomResponse> findAll(Pageable pageable) {
+        return roomRepository.findAll(pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly=true)

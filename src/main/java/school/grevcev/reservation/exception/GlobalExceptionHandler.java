@@ -88,4 +88,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(404)
                 .body(new ApiError(404, "Resource not found", LocalDateTime.now(), null));
     }
+
+    @ExceptionHandler(InvalidStatusTransitionException.class)
+    public ResponseEntity<ApiError> handleInvalidStatusTransitionException(InvalidStatusTransitionException ex) {
+        return ResponseEntity.status(409)
+                .body(new ApiError(409, ex.getMessage(), LocalDateTime.now(), null));
+    }
 }

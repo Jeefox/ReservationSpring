@@ -6,10 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import school.grevcev.reservation.ReservationStatus;
-import school.grevcev.reservation.dto.CreateReservationRequest;
-import school.grevcev.reservation.dto.PageResponse;
-import school.grevcev.reservation.dto.ReservationResponse;
-import school.grevcev.reservation.dto.UpdateReservationRequest;
+import school.grevcev.reservation.dto.*;
 import school.grevcev.reservation.service.ReservationService;
 
 import java.time.LocalDate;
@@ -56,5 +53,11 @@ public class ReservationController {
             Pageable pageable
             ) {
         return PageResponse.from(reservationService.search(userId, roomId, status, from, to, pageable));
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ReservationResponse> updateReservationStatus(@PathVariable Long id, @Valid @RequestBody UpdateStatusRequest request) {
+        ReservationResponse response = reservationService.changeStatus(id, request);
+        return ResponseEntity.status(200).body(response);
     }
 }
