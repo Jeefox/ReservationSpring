@@ -1,6 +1,7 @@
 package school.grevcev.reservation.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -11,6 +12,8 @@ import school.grevcev.reservation.dto.CreateReservationRequest;
 import school.grevcev.reservation.dto.ReservationResponse;
 import school.grevcev.reservation.dto.UpdateReservationRequest;
 import school.grevcev.reservation.dto.UpdateStatusRequest;
+import school.grevcev.reservation.event.ReservationStatusChangedEvent;
+import school.grevcev.reservation.event.ReservationCreatedEvent;
 import school.grevcev.reservation.exception.*;
 import school.grevcev.reservation.model.Reservation;
 import school.grevcev.reservation.model.ReservationSpecifications;
@@ -31,22 +34,20 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final UserRepository userRepository;
     private final RoomRepository roomRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
-    public ReservationService (ReservationRepository reservationRepository, UserRepository userRepository, RoomRepository roomRepository) {
+    public ReservationService (ReservationRepository reservationRepository, UserRepository userRepository,
+                               RoomRepository roomRepository,  ApplicationEventPublisher applicationEventPublisher) {
         this.reservationRepository = reservationRepository;
         this.userRepository = userRepository;
         this.roomRepository = roomRepository;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Transactional(readOnly = true)
     public ReservationResponse getReservationById(Long id) {
         Reservation reservation = reservationRepository.findById(id).orElseThrow(()->new ReservationNotFoundException(id));
         return toResponse(reservation);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<ReservationResponse> getAll(Pageable pageable){
-        return reservationRepository.findAll(pageable).map(this::toResponse);
     }
 
     @Transactional
@@ -67,6 +68,9 @@ public class ReservationService {
                 .build();
 
         Reservation savedReservation = reservationRepository.save(reservation);
+        applicationEventPublisher.publishEvent(new ReservationCreatedEvent(savedReservation.getId(),
+                savedReservation.getRoom().getId(), savedReservation.getStartDate(), savedReservation.getEndDate()));
+
         return toResponse(savedReservation);
     }
 
@@ -130,6 +134,8 @@ public class ReservationService {
         }
             reservation.setStatus(request.status());
             log.info("Reservation {} status changed: {} -> {}", id, currentStatus, request.status());
+
+            applicationEventPublisher.publishEvent(new ReservationStatusChangedEvent(reservation.getId(), currentStatus, request.status()));
             return toResponse(reservation);
     }
 }

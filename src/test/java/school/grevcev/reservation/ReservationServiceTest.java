@@ -5,10 +5,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import school.grevcev.reservation.dto.CreateReservationRequest;
 import school.grevcev.reservation.dto.ReservationResponse;
 import school.grevcev.reservation.dto.UpdateReservationRequest;
 import school.grevcev.reservation.dto.UpdateStatusRequest;
+import school.grevcev.reservation.event.ReservationCreatedEvent;
+import school.grevcev.reservation.event.ReservationStatusChangedEvent;
 import school.grevcev.reservation.exception.*;
 import school.grevcev.reservation.model.Reservation;
 import school.grevcev.reservation.model.Room;
@@ -33,6 +36,7 @@ class ReservationServiceTest {
     @Mock private ReservationRepository reservationRepository;
     @Mock private RoomRepository roomRepository;
     @Mock private UserRepository userRepository;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ReservationService reservationService;
@@ -62,6 +66,7 @@ class ReservationServiceTest {
         assertEquals("Ivan", response.userName());
         assertEquals("luxury", response.roomName());
         verify(reservationRepository).save(any());
+        verify(eventPublisher).publishEvent(any(ReservationCreatedEvent.class));
     }
 
     @Test
@@ -169,6 +174,7 @@ class ReservationServiceTest {
         assertThrows(RoomAlreadyBookedException.class, ()-> reservationService.createReservation(request));
 
         verify(reservationRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -297,6 +303,7 @@ class ReservationServiceTest {
         assertEquals(ReservationStatus.APPROVED, reservation.getStatus());
         assertEquals(ReservationStatus.APPROVED, response.status());
         assertEquals(1L, response.id());
+        verify(eventPublisher).publishEvent(any(ReservationStatusChangedEvent.class));
     }
 
     @Test
@@ -319,6 +326,7 @@ class ReservationServiceTest {
         assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
         assertEquals(ReservationStatus.CANCELLED, response.status());
         assertEquals(1L, response.id());
+        verify(eventPublisher).publishEvent(any(ReservationStatusChangedEvent.class));
     }
 
     @Test
@@ -341,6 +349,7 @@ class ReservationServiceTest {
         assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
         assertEquals(ReservationStatus.CANCELLED, response.status());
         assertEquals(1L, response.id());
+        verify(eventPublisher).publishEvent(any(ReservationStatusChangedEvent.class));
     }
 
     @Test
@@ -361,5 +370,6 @@ class ReservationServiceTest {
         assertThrows(InvalidStatusTransitionException.class, ()-> reservationService.changeStatus(1L, request));
 
         assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 }
