@@ -9,8 +9,11 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import school.grevcev.reservation.dto.*;
 import school.grevcev.reservation.service.RoomService;
+
+import java.net.URI;
 
 @RestController
 @RequestMapping("/api/v1/rooms")
@@ -53,7 +56,12 @@ public class RoomController {
     @PostMapping
     public ResponseEntity<RoomResponse> createRoom(@Valid @RequestBody CreateRoomRequest request){
         RoomResponse created = roomService.save(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()                          // текущий URL: /api/v1/users
+                .path("/{id}")                                  // добавить /3
+                .buildAndExpand(created.id())                   // подставить id
+                .toUri();
+        return ResponseEntity.created(location).body(created);
     }
 
     @Operation(

@@ -9,11 +9,14 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import school.grevcev.reservation.dto.CreateUserRequest;
 import school.grevcev.reservation.dto.PageResponse;
 import school.grevcev.reservation.dto.UpdateUserRequest;
 import school.grevcev.reservation.dto.UserResponse;
 import school.grevcev.reservation.service.UserService;
+
+import java.net.URI;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -61,7 +64,12 @@ public class UserController {
     @PostMapping
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request){
         UserResponse created = userService.save(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()                          // текущий URL: /api/v1/users
+                .path("/{id}")                                  // добавить /3
+                .buildAndExpand(created.id())                   // подставить id
+                .toUri();
+        return ResponseEntity.created(location).body(created);
     }
 
     @Operation(

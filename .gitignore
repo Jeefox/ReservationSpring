@@ -31,3 +31,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Project specific
+.env
+*.log
+.DS_Store
+Thumbs.db

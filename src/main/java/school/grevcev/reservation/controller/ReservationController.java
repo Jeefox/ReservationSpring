@@ -8,10 +8,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import school.grevcev.reservation.ReservationStatus;
 import school.grevcev.reservation.dto.*;
 import school.grevcev.reservation.service.ReservationService;
 
+import java.net.URI;
 import java.time.LocalDate;
 
 @RestController
@@ -39,8 +41,13 @@ public class ReservationController {
     @ApiResponse(responseCode = "409", description = "Комната уже забронирована на указанные даты")
     @PostMapping
     public ResponseEntity<ReservationResponse> createReservation(@Valid @RequestBody CreateReservationRequest createReservationRequest) {
-        ReservationResponse reservationResponse = reservationService.createReservation(createReservationRequest);
-        return ResponseEntity.status(HttpStatus.CREATED).body(reservationResponse);
+        ReservationResponse created = reservationService.createReservation(createReservationRequest);
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()                          // текущий URL: /api/v1/users
+                .path("/{id}")                                  // добавить /3
+                .buildAndExpand(created.id())                   // подставить id
+                .toUri();
+        return ResponseEntity.created(location).body(created);
     }
 
     @Operation(
