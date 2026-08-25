@@ -1,3 +1,5 @@
+![CI](https://github.com/Jeefox/ReservationSpring/actions/workflows/ci.yml/badge.svg)
+
 # Reservation System
 
 REST API системы бронирования комнат со статусной машиной, event-driven уведомлениями и infrastructure-as-code.
