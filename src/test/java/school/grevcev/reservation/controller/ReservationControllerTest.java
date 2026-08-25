@@ -8,11 +8,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import school.grevcev.reservation.ReservationStatus;
 import school.grevcev.reservation.dto.ReservationResponse;
+import school.grevcev.reservation.dto.RoomStatsResponse;
 import school.grevcev.reservation.exception.InvalidStatusTransitionException;
 import school.grevcev.reservation.exception.ReservationNotFoundException;
 import school.grevcev.reservation.service.ReservationService;
+import school.grevcev.reservation.service.RoomService;
+import school.grevcev.reservation.service.UserService;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -30,6 +34,12 @@ class ReservationControllerTest {
 
     @MockitoBean
     private ReservationService reservationService;
+
+    @MockitoBean
+    private RoomService roomService;
+
+    @MockitoBean
+    private UserService userService;
 
     @Test
     void createReservation_returns201WithLocation() throws Exception {
@@ -81,5 +91,16 @@ class ReservationControllerTest {
                         .content("{\"status\":\"APPROVED\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409));
+    }
+
+    @Test
+    void getStats_returnsJsonArray() throws Exception {
+        when(reservationService.getStats(any(), any()))
+                .thenReturn(List.of(new RoomStatsResponse(1L, "luxury", 3L)));
+
+        mockMvc.perform(get("/api/v1/reservations/stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].roomName").value("luxury"))
+                .andExpect(jsonPath("$[0].bookingCount").value(3));
     }
 }

@@ -5,16 +5,18 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import school.grevcev.reservation.ReservationStatus;
 import school.grevcev.reservation.dto.*;
 import school.grevcev.reservation.service.ReservationService;
+import school.grevcev.reservation.service.RoomService;
 
 import java.net.URI;
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("api/v1/reservations")
@@ -22,9 +24,11 @@ import java.time.LocalDate;
 public class ReservationController {
 
     private final ReservationService reservationService;
+    private final RoomService roomService;
 
-    public ReservationController(ReservationService reservationService) {
+    public ReservationController(ReservationService reservationService,  RoomService roomService) {
         this.reservationService = reservationService;
+        this.roomService = roomService;
     }
 
     @Operation(
@@ -134,5 +138,12 @@ public class ReservationController {
     public ResponseEntity<ReservationResponse> updateReservationStatus(@PathVariable Long id, @Valid @RequestBody UpdateStatusRequest request) {
         ReservationResponse response = reservationService.changeStatus(id, request);
         return ResponseEntity.status(200).body(response);
+    }
+
+    @GetMapping("/stats")
+    public List<RoomStatsResponse> getRoomStats(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return reservationService.getStats(from, to);
     }
 }

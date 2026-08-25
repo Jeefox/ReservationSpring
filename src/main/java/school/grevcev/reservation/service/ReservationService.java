@@ -8,10 +8,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import school.grevcev.reservation.ReservationStatus;
-import school.grevcev.reservation.dto.CreateReservationRequest;
-import school.grevcev.reservation.dto.ReservationResponse;
-import school.grevcev.reservation.dto.UpdateReservationRequest;
-import school.grevcev.reservation.dto.UpdateStatusRequest;
+import school.grevcev.reservation.dto.*;
 import school.grevcev.reservation.event.ReservationStatusChangedEvent;
 import school.grevcev.reservation.event.ReservationCreatedEvent;
 import school.grevcev.reservation.exception.*;
@@ -137,5 +134,10 @@ public class ReservationService {
 
             applicationEventPublisher.publishEvent(new ReservationStatusChangedEvent(reservation.getId(), currentStatus, request.status()));
             return toResponse(reservation);
+    }
+
+    @Transactional
+    public List<RoomStatsResponse> getStats(LocalDate from, LocalDate to) {
+        return  reservationRepository.getStats(from, to);
     }
 }

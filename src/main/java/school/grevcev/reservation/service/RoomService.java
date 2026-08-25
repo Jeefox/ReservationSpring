@@ -6,10 +6,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import school.grevcev.reservation.dto.CreateRoomRequest;
 import school.grevcev.reservation.dto.RoomResponse;
+import school.grevcev.reservation.dto.RoomStatsResponse;
 import school.grevcev.reservation.dto.UpdateRoomRequest;
 import school.grevcev.reservation.exception.RoomNotFoundException;
 import school.grevcev.reservation.model.Room;
 import school.grevcev.reservation.repository.RoomRepository;
+
+import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class RoomService {

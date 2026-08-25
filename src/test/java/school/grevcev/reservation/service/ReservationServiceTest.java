@@ -7,10 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import school.grevcev.reservation.ReservationStatus;
-import school.grevcev.reservation.dto.CreateReservationRequest;
-import school.grevcev.reservation.dto.ReservationResponse;
-import school.grevcev.reservation.dto.UpdateReservationRequest;
-import school.grevcev.reservation.dto.UpdateStatusRequest;
+import school.grevcev.reservation.dto.*;
 import school.grevcev.reservation.event.ReservationCreatedEvent;
 import school.grevcev.reservation.event.ReservationStatusChangedEvent;
 import school.grevcev.reservation.exception.*;
@@ -371,5 +368,21 @@ class ReservationServiceTest {
 
         assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
         verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void getRoomStats_success(){
+        LocalDate from = LocalDate.of(2026, 12, 1);
+        LocalDate to = LocalDate.of(2026, 12, 31);
+
+        when(reservationRepository.getStats(from, to))
+                .thenReturn(List.of(new RoomStatsResponse(1L, "luxury", 3L)));
+
+        List<RoomStatsResponse> result = reservationService.getStats(from, to);  // WHEN через сервис!
+
+        assertEquals(1, result.size());
+        assertEquals("luxury", result.get(0).roomName());
+        assertEquals(3L, result.get(0).bookingCount());
+        verify(reservationRepository).getStats(from, to);
     }
 }

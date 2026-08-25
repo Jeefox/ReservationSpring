@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import school.grevcev.reservation.ReservationStatus;
+import school.grevcev.reservation.dto.RoomStatsResponse;
 import school.grevcev.reservation.model.Reservation;
 import school.grevcev.reservation.model.Room;
 import school.grevcev.reservation.model.User;
@@ -31,4 +32,15 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long>,
 
     @EntityGraph(attributePaths = {"user", "room"})
     Page<Reservation> findAllBy(Specification<Reservation> spec, Pageable pageable);
+
+    @Query("""
+        select new school.grevcev.reservation.dto.RoomStatsResponse(
+               r.room.id, r.room.name, count(r))
+        from Reservation r
+        where (:from is null or r.endDate >= :from)
+          and (:to is null or r.startDate <= :to)
+        group by r.room.id, r.room.name
+        order by count(r) desc
+        """)
+    List<RoomStatsResponse> getStats(@Param("from") LocalDate from, @Param("to") LocalDate to);
 }
