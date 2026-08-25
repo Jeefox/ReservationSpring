@@ -42,12 +42,16 @@ public class ReservationController {
     @PostMapping
     public ResponseEntity<ReservationResponse> createReservation(@Valid @RequestBody CreateReservationRequest createReservationRequest) {
         ReservationResponse created = reservationService.createReservation(createReservationRequest);
-        URI location = ServletUriComponentsBuilder
-                .fromCurrentRequest()                          // текущий URL: /api/v1/users
-                .path("/{id}")                                  // добавить /3
-                .buildAndExpand(created.id())                   // подставить id
+        return ResponseEntity
+                .created(buildLocation(created.id()))
+                .body(created);
+    }
+
+    private URI buildLocation(Long id) {
+        return ServletUriComponentsBuilder.fromCurrentRequest()   // /api/v1/users
+                .path("/{id}")                                     // + /5
+                .buildAndExpand(id)
                 .toUri();
-        return ResponseEntity.created(location).body(created);
     }
 
     @Operation(

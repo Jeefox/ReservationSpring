@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
@@ -56,12 +57,16 @@ public class RoomController {
     @PostMapping
     public ResponseEntity<RoomResponse> createRoom(@Valid @RequestBody CreateRoomRequest request){
         RoomResponse created = roomService.save(request);
-        URI location = ServletUriComponentsBuilder
-                .fromCurrentRequest()                          // текущий URL: /api/v1/users
-                .path("/{id}")                                  // добавить /3
-                .buildAndExpand(created.id())                   // подставить id
+        return ResponseEntity
+                .created(buildLocation(created.id()))
+                .body(created);
+    }
+
+    private URI buildLocation(Long id) {
+        return ServletUriComponentsBuilder.fromCurrentRequest()   // /api/v1/users
+                .path("/{id}")                                     // + /5
+                .buildAndExpand(id)
                 .toUri();
-        return ResponseEntity.created(location).body(created);
     }
 
     @Operation(
