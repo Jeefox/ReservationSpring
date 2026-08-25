@@ -121,7 +121,7 @@ public class ReservationService {
         if(status != null) specifications.add(ReservationSpecifications.hasStatus(status));
         if (from != null && to != null) specifications.add(ReservationSpecifications.overlapsWith(from, to));
 
-        return  reservationRepository.findAll(Specification.allOf(specifications), pageable).map(this::toResponse);
+        return  reservationRepository.findAllBy(Specification.allOf(specifications), pageable).map(this::toResponse);
     }
 
     @Transactional

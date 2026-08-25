@@ -1,5 +1,6 @@
 ![CI](https://github.com/Jeefox/ReservationSpring/actions/workflows/ci.yml/badge.svg)
 
+Postman-коллекция для регрессии: [`docs/postman-collection.json`](docs/postman-collection.json) — импортируй в Postman и гоняй все сценарии одной кнопкой (Collection Runner).
 # Reservation System
 
 REST API системы бронирования комнат со статусной машиной, event-driven уведомлениями и infrastructure-as-code.

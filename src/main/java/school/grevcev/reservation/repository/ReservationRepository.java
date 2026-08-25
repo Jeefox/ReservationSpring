@@ -1,11 +1,17 @@
 package school.grevcev.reservation.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import school.grevcev.reservation.ReservationStatus;
 import school.grevcev.reservation.model.Reservation;
+import school.grevcev.reservation.model.Room;
+import school.grevcev.reservation.model.User;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -22,4 +28,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long>,
                                                 @Param("endDate")LocalDate endDate,
                                                 @Param("cancelledStatus") ReservationStatus cancelledStatus,
                                                 @Param("excludedId") Long excludedId);
+
+    @EntityGraph(attributePaths = {"user", "room"})
+    Page<Reservation> findAllBy(Specification<Reservation> spec, Pageable pageable);
 }
