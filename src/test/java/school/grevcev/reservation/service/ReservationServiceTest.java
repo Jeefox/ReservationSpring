@@ -49,7 +49,7 @@ class ReservationServiceTest {
         Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(roomRepository.findById(2L)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(room));
 
         Reservation saved = Reservation.builder().id(10L).user(user).room(room)
                 .startDate(createReservationRequest.startDate()).endDate(createReservationRequest.endDate())
@@ -112,7 +112,7 @@ class ReservationServiceTest {
         );
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(roomRepository.findById(2L)).thenReturn(Optional.empty());
+        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.empty());
 
         assertThrows(RoomNotFoundException.class, ()-> reservationService.createReservation(request));
     }
@@ -163,7 +163,7 @@ class ReservationServiceTest {
                 .build();
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(roomRepository.findById(2L)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(room));
 
         when(reservationRepository.findConflictingReservations(request.roomId(), request.startDate(),
                 request.endDate(), ReservationStatus.CANCELLED, null)).thenReturn(List.of(conflictingReservation));
@@ -185,7 +185,7 @@ class ReservationServiceTest {
         Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(roomRepository.findById(2L)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(room));
 
         // Мокаем возврат ПУСТОГО списка (нет конфликтов)
         when(reservationRepository.findConflictingReservations(
@@ -226,7 +226,7 @@ class ReservationServiceTest {
                 .build();
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(roomRepository.findById(2L)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(room));
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
 
         when(reservationRepository.findConflictingReservations(
@@ -263,7 +263,7 @@ class ReservationServiceTest {
 
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
         when(userRepository.findById(3L)).thenReturn(Optional.of(newUser));
-        when(roomRepository.findById(4L)).thenReturn(Optional.of(newRoom));
+        when(roomRepository.findByIdForUpdate(4L)).thenReturn(Optional.of(newRoom));
 
         User otherUser = User.builder().id(99L).name("Other").email("other@email.com").build();
         Reservation conflicting = Reservation.builder()

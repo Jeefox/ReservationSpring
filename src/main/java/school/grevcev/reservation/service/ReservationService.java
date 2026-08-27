@@ -50,7 +50,7 @@ public class ReservationService {
     @Transactional
     public ReservationResponse createReservation(CreateReservationRequest request) {
         User user = userRepository.findById(request.userId()).orElseThrow(()-> new UserNotFoundException(request.userId()));
-        Room room = roomRepository.findById(request.roomId()).orElseThrow(()->new RoomNotFoundException(request.roomId()));
+        Room room = roomRepository.findByIdForUpdate(request.roomId()).orElseThrow(()->new RoomNotFoundException(request.roomId()));
 
         List<Reservation> conflicting = reservationRepository.findConflictingReservations(room.getId(), request.startDate(),
                 request.endDate(), ReservationStatus.CANCELLED, null);
@@ -88,7 +88,7 @@ public class ReservationService {
     public ReservationResponse updateReservation(Long id, UpdateReservationRequest request) {
         Reservation foundReservation = reservationRepository.findById(id).orElseThrow(()-> new ReservationNotFoundException(id));
         User user = userRepository.findById(request.userId()).orElseThrow(()-> new UserNotFoundException(request.userId()));
-        Room room = roomRepository.findById(request.roomId()).orElseThrow(()-> new RoomNotFoundException(request.roomId()));
+        Room room = roomRepository.findByIdForUpdate(request.roomId()).orElseThrow(()-> new RoomNotFoundException(request.roomId()));
 
         List<Reservation> conflicting = reservationRepository.findConflictingReservations(request.roomId(), request.startDate(),
                 request.endDate(), ReservationStatus.CANCELLED, id);
