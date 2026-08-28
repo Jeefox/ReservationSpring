@@ -3,6 +3,7 @@ package school.grevcev.reservation.dbSeeder;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import school.grevcev.reservation.dto.UserRole;
 import school.grevcev.reservation.model.Room;
 import school.grevcev.reservation.model.User;
 import school.grevcev.reservation.repository.RoomRepository;
@@ -11,6 +12,10 @@ import school.grevcev.reservation.repository.UserRepository;
 @Profile("dev")
 @Component
 public class DataSeeder implements CommandLineRunner {
+
+    private static final String USER_PASSWORD_HASH = "$2a$10$he3s1K2JUz0DHagC7UVh/Oosq4u0L6kdcWpARyvnBTtPpEs1FzNDC";
+    private static final String ADMIN_PASSWORD_HASH = "$2a$10$STtJk5kCZi1OVrro8ui3.u02HW.AVmEbs/c/1Y5H8Qt9FhahDSTk6";
+
     private UserRepository userRepository;
     private RoomRepository roomRepository;
 
@@ -20,27 +25,42 @@ public class DataSeeder implements CommandLineRunner {
     }
     @Override
     public void run(String... args) throws Exception {
-        User ivan = User.builder()
+        if (userRepository.count() > 0) {
+            return;
+        }
+
+        // Обычные пользователи — пароль password1
+        User ivan = userRepository.save(User.builder()
                 .name("Ivan")
                 .email("ivan@email.com")
-                .build();
-        Room luxuryRoom = Room.builder()
-                .name("luxury")
-                .capacity(2)
-                .build();
-        User maria = User.builder()
+                .password(USER_PASSWORD_HASH)
+                .role(UserRole.USER)
+                .build());
+
+        User maria = userRepository.save(User.builder()
                 .name("Maria")
                 .email("maria@email.com")
-                .build();
-        Room casualRoom = Room.builder()
+                .password(USER_PASSWORD_HASH)
+                .role(UserRole.USER)
+                .build());
+
+        // Администратор — пароль admin1
+        userRepository.save(User.builder()
+                .name("Admin")
+                .email("admin@admin.com")
+                .password(ADMIN_PASSWORD_HASH)
+                .role(UserRole.ADMIN)
+                .build());
+
+        // Комнаты
+        Room luxuryRoom = roomRepository.save(Room.builder()
+                .name("luxury")
+                .capacity(2)
+                .build());
+
+        Room casualRoom = roomRepository.save(Room.builder()
                 .name("casual")
                 .capacity(4)
-                .build();
-
-        userRepository.save(ivan);
-        userRepository.save(maria);
-
-        roomRepository.save(luxuryRoom);
-        roomRepository.save(casualRoom);
+                .build());
     }
 }

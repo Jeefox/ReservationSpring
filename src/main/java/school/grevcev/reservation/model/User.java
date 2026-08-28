@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import school.grevcev.reservation.dto.UserRole;
 
 @Entity
 @Builder
@@ -24,4 +25,11 @@ public class User {
     @Email
     @Column(unique = true)
     private String email;
+
+    @NotNull
+    private String password;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    private UserRole role;
 }

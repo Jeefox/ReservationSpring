@@ -3,6 +3,7 @@ package school.grevcev.reservation.exception;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -95,5 +96,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleInvalidStatusTransitionException(InvalidStatusTransitionException ex) {
         return ResponseEntity.status(409)
                 .body(new ApiError(409, ex.getMessage(), LocalDateTime.now(), null));
+    }
+
+    @ExceptionHandler(EmailAlreadyExistsException.class)
+    public ResponseEntity<ApiError> handleEmailTaken(EmailAlreadyExistsException ex) {
+        return ResponseEntity.status(409).body(new ApiError(409, ex.getMessage(), LocalDateTime.now(), null));
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiError> handleBadCredentials(InvalidCredentialsException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiError(401, ex.getMessage(), LocalDateTime.now(), null));
     }
 }
