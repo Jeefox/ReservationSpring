@@ -5,6 +5,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import school.grevcev.reservation.ReservationStatus;
@@ -48,8 +49,9 @@ public class ReservationService {
     }
 
     @Transactional
-    public ReservationResponse createReservation(CreateReservationRequest request) {
-        User user = userRepository.findById(request.userId()).orElseThrow(()-> new UserNotFoundException(request.userId()));
+    public ReservationResponse createReservation(CreateReservationRequest request, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(()->new UserNotFoundException());
         Room room = roomRepository.findByIdForUpdate(request.roomId()).orElseThrow(()->new RoomNotFoundException(request.roomId()));
 
         List<Reservation> conflicting = reservationRepository.findConflictingReservations(room.getId(), request.startDate(),
@@ -61,7 +63,7 @@ public class ReservationService {
                 .room(room)
                 .startDate(request.startDate())
                 .endDate(request.endDate())
-                .status(request.status())
+                .status(ReservationStatus.PENDING)
                 .build();
 
         Reservation savedReservation = reservationRepository.save(reservation);
@@ -85,55 +87,102 @@ public class ReservationService {
     }
 
     @Transactional
-    public ReservationResponse updateReservation(Long id, UpdateReservationRequest request) {
-        Reservation foundReservation = reservationRepository.findById(id).orElseThrow(()-> new ReservationNotFoundException(id));
-        User user = userRepository.findById(request.userId()).orElseThrow(()-> new UserNotFoundException(request.userId()));
-        Room room = roomRepository.findByIdForUpdate(request.roomId()).orElseThrow(()-> new RoomNotFoundException(request.roomId()));
+    public ReservationResponse updateReservation(Long id, UpdateReservationRequest request, String email) {
+        Reservation found = reservationRepository.findById(id)
+                .orElseThrow(() -> new ReservationNotFoundException(id));
+
+        User currentUser = userRepository.findByEmail(email)
+                .orElseThrow(UserNotFoundException::new);
+
+        boolean isOwner = found.getUser().getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
+        if (!isOwner && !isAdmin) throw new AccessDeniedException("Вы не владелец этой брони");
+
+        Room room = roomRepository.findByIdForUpdate(request.roomId())
+                .orElseThrow(() -> new RoomNotFoundException(request.roomId()));
 
         List<Reservation> conflicting = reservationRepository.findConflictingReservations(request.roomId(), request.startDate(),
                 request.endDate(), ReservationStatus.CANCELLED, id);
 
         if(!conflicting.isEmpty()) throw new RoomAlreadyBookedException(request.roomId(), request.startDate(), request.endDate());
 
-        foundReservation.setUser(user);
-        foundReservation.setRoom(room);
-        foundReservation.setStartDate(request.startDate());
-        foundReservation.setEndDate(request.endDate());
-        foundReservation.setStatus(request.status());
+        found.setRoom(room);
+        found.setStartDate(request.startDate());
+        found.setEndDate(request.endDate());
 
-        return toResponse(foundReservation);
+        return toResponse(found);
     }
 
     @Transactional
-    public void deleteReservationById(Long id) {
-        Reservation foundReservation = reservationRepository.findById(id).orElseThrow(()-> new ReservationNotFoundException(id));
-        reservationRepository.delete(foundReservation);
+    public void deleteReservationById(Long id, String email) {
+        Reservation found = reservationRepository.findById(id)
+                .orElseThrow(() -> new ReservationNotFoundException(id));
+
+        User currentUser = userRepository.findByEmail(email)
+                .orElseThrow(UserNotFoundException::new);
+
+        boolean isOwner = found.getUser().getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
+        if (!isOwner && !isAdmin) throw new AccessDeniedException("Вы не владелец этой брони");
+
+        reservationRepository.delete(found);
     }
 
     @Transactional(readOnly = true)
-    public Page<ReservationResponse> search(Long userId, Long roomId, ReservationStatus status, LocalDate from, LocalDate to, Pageable pageable){
+    public Page<ReservationResponse> search(Long userId, Long roomId, ReservationStatus status,
+                                            LocalDate from, LocalDate to, Pageable pageable, String email) {
+
+        User currentUser = userRepository.findByEmail(email)
+                .orElseThrow(UserNotFoundException::new);
+        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
+
         List<Specification<Reservation>> specifications = new ArrayList<>();
-        if(userId != null) specifications.add(ReservationSpecifications.hasUserId(userId));
-        if(roomId != null) specifications.add(ReservationSpecifications.hasRoomId(roomId));
-        if(status != null) specifications.add(ReservationSpecifications.hasStatus(status));
+
+        // Ключевая логика:
+        if (userId != null) {
+            // если userId передан — ADMIN видит все, USER только свои
+            Long effectiveUserId = isAdmin ? userId : currentUser.getId();
+            specifications.add(ReservationSpecifications.hasUserId(effectiveUserId));
+        } else if (!isAdmin) {
+            // USER без userId → только свои
+            specifications.add(ReservationSpecifications.hasUserId(currentUser.getId()));
+        }
+        // ADMIN без userId → видит все (спецификация не добавляется)
+
+        if (roomId != null) specifications.add(ReservationSpecifications.hasRoomId(roomId));
+        if (status != null) specifications.add(ReservationSpecifications.hasStatus(status));
         if (from != null && to != null) specifications.add(ReservationSpecifications.overlapsWith(from, to));
 
-        return  reservationRepository.findAllBy(Specification.allOf(specifications), pageable).map(this::toResponse);
+        return reservationRepository.findAllBy(Specification.allOf(specifications), pageable).map(this::toResponse);
     }
 
     @Transactional
-    public ReservationResponse changeStatus(Long id, UpdateStatusRequest request) {
-        Reservation reservation = reservationRepository.findById(id).orElseThrow(()-> new ReservationNotFoundException(id));
+    public ReservationResponse changeStatus(Long id, UpdateStatusRequest request, String email) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new ReservationNotFoundException(id));
 
         ReservationStatus currentStatus = reservation.getStatus();
-        if(!currentStatus.canTransitionTo(request.status())) {
+        if (!currentStatus.canTransitionTo(request.status())) {
             throw new InvalidStatusTransitionException(currentStatus, request.status());
         }
-            reservation.setStatus(request.status());
-            log.info("Reservation {} status changed: {} -> {}", id, currentStatus, request.status());
 
-            applicationEventPublisher.publishEvent(new ReservationStatusChangedEvent(reservation.getId(), currentStatus, request.status()));
-            return toResponse(reservation);
+        User currentUser = userRepository.findByEmail(email)
+                .orElseThrow(UserNotFoundException::new);
+
+        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
+        boolean isOwner = reservation.getUser().getId().equals(currentUser.getId());
+
+        if (ReservationStatus.isApproverRequired(currentStatus, request.status())) {
+            if (!isAdmin) throw new AccessDeniedException("Только админ может одобрять брони");
+        } else {
+            if (!isOwner && !isAdmin) throw new AccessDeniedException("Вы не владелец этой брони");
+        }
+
+        reservation.setStatus(request.status());
+        log.info("Reservation {} status changed: {} -> {}", id, currentStatus, request.status());
+        applicationEventPublisher.publishEvent(new ReservationStatusChangedEvent(reservation.getId(), currentStatus, reservation.getStatus()));
+
+        return toResponse(reservation);
     }
 
     @Transactional

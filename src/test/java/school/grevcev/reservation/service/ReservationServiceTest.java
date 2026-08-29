@@ -6,6 +6,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
 import school.grevcev.reservation.ReservationStatus;
 import school.grevcev.reservation.dto.*;
 import school.grevcev.reservation.event.ReservationCreatedEvent;
@@ -25,6 +26,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,30 +40,36 @@ class ReservationServiceTest {
     @InjectMocks
     private ReservationService reservationService;
 
+    // ============== createReservation ==============
+
     @Test
     void createReservation_success() {
-        CreateReservationRequest createReservationRequest = new CreateReservationRequest(
-                1L, 2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(4),
-                ReservationStatus.PENDING
-        );
+        // В CreateReservationRequest больше нет userId и status
+        CreateReservationRequest request = new CreateReservationRequest(
+                2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(4));
 
-        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
         Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        // Сервис теперь резолвит по EMAIL из токена
+        when(userRepository.findByEmail("ivan@email.com")).thenReturn(Optional.of(user));
         when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(room));
+        when(reservationRepository.findConflictingReservations(
+                2L, request.startDate(), request.endDate(), ReservationStatus.CANCELLED, null))
+                .thenReturn(List.of());
 
         Reservation saved = Reservation.builder().id(10L).user(user).room(room)
-                .startDate(createReservationRequest.startDate()).endDate(createReservationRequest.endDate())
-                .status(createReservationRequest.status()).build();
-
+                .startDate(request.startDate()).endDate(request.endDate())
+                .status(ReservationStatus.PENDING).build();
         when(reservationRepository.save(any())).thenReturn(saved);
 
-        ReservationResponse response = reservationService.createReservation(createReservationRequest);
+        ReservationResponse response = reservationService.createReservation(request, "ivan@email.com");
 
         assertEquals(10L, response.id());
         assertEquals("Ivan", response.userName());
         assertEquals("luxury", response.roomName());
+        assertEquals(ReservationStatus.PENDING, response.status());
         verify(reservationRepository).save(any());
         verify(eventPublisher).publishEvent(any(ReservationCreatedEvent.class));
     }
@@ -69,57 +77,92 @@ class ReservationServiceTest {
     @Test
     void createReservation_userNotFound() {
         CreateReservationRequest request = new CreateReservationRequest(
-                999L, 2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(4),
-                ReservationStatus.PENDING
-        );
+                2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(4));
 
-        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("fake@email.com")).thenReturn(Optional.empty());
 
-        assertThrows(UserNotFoundException.class, ()-> reservationService.createReservation(request));
-    }
-
-    @Test
-    void getReservationById_success(){
-       User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
-       Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
-       Reservation reservation = Reservation.builder().id(10L).user(user).room(room)
-               .startDate(LocalDate.now().plusDays(1))
-               .endDate(LocalDate.now().plusDays(3))
-               .status(ReservationStatus.PENDING)
-               .build();
-
-       when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
-
-       ReservationResponse response = reservationService.getReservationById(10L);
-
-       assertEquals(10L, response.id());
-       assertEquals("Ivan", response.userName());
-    }
-
-    @Test
-    void getReservationById_notFound() {
-        when(reservationRepository.findById(999L)).thenReturn(Optional.empty());
-
-        assertThrows(ReservationNotFoundException.class, ()-> reservationService.getReservationById(999L));
+        assertThrows(UserNotFoundException.class,
+                () -> reservationService.createReservation(request, "fake@email.com"));
     }
 
     @Test
     void createReservation_roomNotFound() {
-        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
         CreateReservationRequest request = new CreateReservationRequest(
-                1L, 2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(4),
-                ReservationStatus.PENDING
-        );
+                2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(4));
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
+
+        when(userRepository.findByEmail("ivan@email.com")).thenReturn(Optional.of(user));
         when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.empty());
 
-        assertThrows(RoomNotFoundException.class, ()-> reservationService.createReservation(request));
+        assertThrows(RoomNotFoundException.class,
+                () -> reservationService.createReservation(request, "ivan@email.com"));
     }
 
     @Test
-    void deleteReservation_success() {
-        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+    void createReservation_roomAlreadyBooked() {
+        CreateReservationRequest request = new CreateReservationRequest(
+                2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(4));
+
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+
+        User otherUser = User.builder().id(99L).name("Other").email("other@email.com")
+                .role(UserRole.USER).build();
+        Reservation conflicting = Reservation.builder()
+                .id(5L).user(otherUser).room(room)
+                .startDate(LocalDate.now().plusDays(2))
+                .endDate(LocalDate.now().plusDays(5))
+                .status(ReservationStatus.PENDING)
+                .build();
+
+        when(userRepository.findByEmail("ivan@email.com")).thenReturn(Optional.of(user));
+        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(room));
+        when(reservationRepository.findConflictingReservations(
+                2L, request.startDate(), request.endDate(), ReservationStatus.CANCELLED, null))
+                .thenReturn(List.of(conflicting));
+
+        assertThrows(RoomAlreadyBookedException.class,
+                () -> reservationService.createReservation(request, "ivan@email.com"));
+
+        verify(reservationRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void createReservation_noConflict() {
+        CreateReservationRequest request = new CreateReservationRequest(
+                2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(4));
+
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+
+        when(userRepository.findByEmail("ivan@email.com")).thenReturn(Optional.of(user));
+        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(room));
+        when(reservationRepository.findConflictingReservations(
+                2L, request.startDate(), request.endDate(), ReservationStatus.CANCELLED, null))
+                .thenReturn(List.of());
+
+        Reservation saved = Reservation.builder().id(10L).user(user).room(room)
+                .startDate(request.startDate()).endDate(request.endDate())
+                .status(ReservationStatus.PENDING).build();
+        when(reservationRepository.save(any())).thenReturn(saved);
+
+        ReservationResponse response = reservationService.createReservation(request, "ivan@email.com");
+
+        assertEquals(10L, response.id());
+        verify(reservationRepository).save(any());
+    }
+
+    // ============== getReservationById ==============
+
+    @Test
+    void getReservationById_success() {
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
         Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
         Reservation reservation = Reservation.builder().id(10L).user(user).room(room)
                 .startDate(LocalDate.now().plusDays(1))
@@ -129,143 +172,100 @@ class ReservationServiceTest {
 
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
 
-        reservationService.deleteReservationById(10L);
+        ReservationResponse response = reservationService.getReservationById(10L);
 
-        verify(reservationRepository).delete(reservation);
+        assertEquals(10L, response.id());
+        assertEquals("Ivan", response.userName());
     }
 
     @Test
-    void deleteReservation_notFound() {
-
+    void getReservationById_notFound() {
         when(reservationRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThrows(ReservationNotFoundException.class, ()-> reservationService.deleteReservationById(999L));
-
-        verify(reservationRepository, never()).delete(any(Reservation.class));
+        assertThrows(ReservationNotFoundException.class,
+                () -> reservationService.getReservationById(999L));
     }
 
-    @Test
-    void createReservation_roomAlreadyBooked() {
-        CreateReservationRequest request = new CreateReservationRequest(
-                1L, 2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(4),
-                ReservationStatus.PENDING
-        );
-
-        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
-        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
-
-        User otherUser = User.builder().id(99L).name("Other").email("other@email.com").build();
-        Reservation conflictingReservation = Reservation.builder()
-                .id(5L).user(otherUser).room(room)
-                .startDate(LocalDate.now().plusDays(2))  // пересечение дат
-                .endDate(LocalDate.now().plusDays(5))
-                .status(ReservationStatus.PENDING)
-                .build();
-
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(room));
-
-        when(reservationRepository.findConflictingReservations(request.roomId(), request.startDate(),
-                request.endDate(), ReservationStatus.CANCELLED, null)).thenReturn(List.of(conflictingReservation));
-
-        assertThrows(RoomAlreadyBookedException.class, ()-> reservationService.createReservation(request));
-
-        verify(reservationRepository, never()).save(any());
-        verify(eventPublisher, never()).publishEvent(any());
-    }
-
-    @Test
-    void createReservation_noConflict() {
-        CreateReservationRequest request = new CreateReservationRequest(
-                1L, 2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(4),
-                ReservationStatus.PENDING
-        );
-
-        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
-        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
-
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(room));
-
-        // Мокаем возврат ПУСТОГО списка (нет конфликтов)
-        when(reservationRepository.findConflictingReservations(
-                2L, request.startDate(), request.endDate(),
-                ReservationStatus.CANCELLED, null))
-                .thenReturn(List.of());  // ← просто пустой список, без Optional!
-
-        Reservation saved = Reservation.builder().id(10L).user(user).room(room)
-                .startDate(request.startDate()).endDate(request.endDate())
-                .status(request.status()).build();
-        when(reservationRepository.save(any())).thenReturn(saved);
-
-        // WHEN
-        ReservationResponse response = reservationService.createReservation(request);
-
-        // THEN
-        assertEquals(10L, response.id());
-        verify(reservationRepository).save(any());
-    }
+    // ============== updateReservation ==============
 
     @Test
     void updateReservation_sameReservationNoConflict() {
-
+        // В UpdateReservationRequest больше нет userId и status
         UpdateReservationRequest request = new UpdateReservationRequest(
-                1L, 2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.PENDING
-        );
+                2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(3));
 
-        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
         Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
         Reservation reservation = Reservation.builder()
-                .id(10L)
-                .user(user)
-                .room(room)
+                .id(10L).user(user).room(room)
                 .status(ReservationStatus.PENDING)
                 .startDate(LocalDate.now().plusDays(1))
                 .endDate(LocalDate.now().plusDays(3))
                 .build();
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(room));
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
-
+        when(userRepository.findByEmail("ivan@email.com")).thenReturn(Optional.of(user));
+        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(room));
         when(reservationRepository.findConflictingReservations(
-                2L, request.startDate(), request.endDate(),
-                ReservationStatus.CANCELLED, 10L))
-                .thenReturn(List.of());  // ← просто пустой список, без Optional!
+                2L, request.startDate(), request.endDate(), ReservationStatus.CANCELLED, 10L))
+                .thenReturn(List.of());
 
-        reservationService.updateReservation(10L, request);
+        reservationService.updateReservation(10L, request, "ivan@email.com");
 
         verify(reservationRepository).findConflictingReservations(
                 eq(2L), any(), any(), eq(ReservationStatus.CANCELLED), eq(10L));
     }
 
     @Test
-    void updateReservation_conflictWithOver(){
+    void updateReservation_notOwner_throwsAccessDenied() {
         UpdateReservationRequest request = new UpdateReservationRequest(
-                3L, 4L, LocalDate.now().plusDays(2), LocalDate.now().plusDays(4),
-                ReservationStatus.PENDING
-        );
+                2L, LocalDate.now().plusDays(1), LocalDate.now().plusDays(3));
 
-        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+        User owner = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
+        User otherUser = User.builder().id(99L).name("Other").email("other@email.com")
+                .role(UserRole.USER).build();
         Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+
         Reservation reservation = Reservation.builder()
-                .id(10L)
-                .user(user)
-                .room(room)
+                .id(10L).user(owner).room(room)
                 .status(ReservationStatus.PENDING)
                 .startDate(LocalDate.now().plusDays(1))
                 .endDate(LocalDate.now().plusDays(3))
                 .build();
 
-        User newUser = User.builder().id(3L).name("NewUser").email("new@email.com").build();
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByEmail("other@email.com")).thenReturn(Optional.of(otherUser));
+
+        // other пытается править чужую бронь → 403
+        assertThrows(AccessDeniedException.class,
+                () -> reservationService.updateReservation(10L, request, "other@email.com"));
+    }
+
+    @Test
+    void updateReservation_conflictWithOver() {
+        UpdateReservationRequest request = new UpdateReservationRequest(
+                4L, LocalDate.now().plusDays(2), LocalDate.now().plusDays(4));
+
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+        Reservation reservation = Reservation.builder()
+                .id(10L).user(user).room(room)
+                .status(ReservationStatus.PENDING)
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(3))
+                .build();
+
         Room newRoom = Room.builder().id(4L).name("newRoom").capacity(3).build();
 
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
-        when(userRepository.findById(3L)).thenReturn(Optional.of(newUser));
+        when(userRepository.findByEmail("ivan@email.com")).thenReturn(Optional.of(user));
         when(roomRepository.findByIdForUpdate(4L)).thenReturn(Optional.of(newRoom));
 
-        User otherUser = User.builder().id(99L).name("Other").email("other@email.com").build();
+        User otherUser = User.builder().id(99L).name("Other").email("other@email.com")
+                .role(UserRole.USER).build();
         Reservation conflicting = Reservation.builder()
                 .id(5L).user(otherUser).room(newRoom)
                 .startDate(LocalDate.now().plusDays(2))
@@ -274,111 +274,217 @@ class ReservationServiceTest {
                 .build();
 
         when(reservationRepository.findConflictingReservations(
-                4L, request.startDate(), request.endDate(),
-                ReservationStatus.CANCELLED, 10L)).thenReturn(List.of(conflicting));
+                4L, request.startDate(), request.endDate(), ReservationStatus.CANCELLED, 10L))
+                .thenReturn(List.of(conflicting));
 
-        assertThrows(RoomAlreadyBookedException.class, ()-> reservationService.updateReservation(10L, request));
+        assertThrows(RoomAlreadyBookedException.class,
+                () -> reservationService.updateReservation(10L, request, "ivan@email.com"));
+    }
+
+    // ============== deleteReservation ==============
+
+    @Test
+    void deleteReservation_success() {
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+        Reservation reservation = Reservation.builder().id(10L).user(user).room(room)
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(3))
+                .status(ReservationStatus.PENDING)
+                .build();
+
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByEmail("ivan@email.com")).thenReturn(Optional.of(user));
+
+        reservationService.deleteReservationById(10L, "ivan@email.com");
+
+        verify(reservationRepository).delete(reservation);
     }
 
     @Test
-    void changeStatus_pendingToApproved_success(){
-        UpdateStatusRequest request = new UpdateStatusRequest(ReservationStatus.APPROVED);
-        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+    void deleteReservation_notOwner_throwsAccessDenied() {
+        User owner = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
+        User otherUser = User.builder().id(99L).name("Other").email("other@email.com")
+                .role(UserRole.USER).build();
         Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
 
-        Reservation reservation =  Reservation.builder()
-                .id(1L)
-                .user(user)
-                .room(room)
+        Reservation reservation = Reservation.builder().id(10L).user(owner).room(room)
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(3))
+                .status(ReservationStatus.PENDING)
+                .build();
+
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByEmail("other@email.com")).thenReturn(Optional.of(otherUser));
+
+        assertThrows(AccessDeniedException.class,
+                () -> reservationService.deleteReservationById(10L, "other@email.com"));
+
+        verify(reservationRepository, never()).delete(any(Reservation.class));
+    }
+
+    @Test
+    void deleteReservation_notFound() {
+        when(reservationRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(ReservationNotFoundException.class,
+                () -> reservationService.deleteReservationById(999L, "ivan@email.com"));
+
+        verify(reservationRepository, never()).delete(any(Reservation.class));
+    }
+
+    @Test
+    void deleteReservation_adminCanDeleteOthers() {
+        User owner = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
+        User admin = User.builder().id(99L).name("Admin").email("admin@admin.com")
+                .role(UserRole.ADMIN).build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+
+        Reservation reservation = Reservation.builder().id(10L).user(owner).room(room)
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(3))
+                .status(ReservationStatus.PENDING)
+                .build();
+
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByEmail("admin@admin.com")).thenReturn(Optional.of(admin));
+
+        reservationService.deleteReservationById(10L, "admin@admin.com");
+
+        verify(reservationRepository).delete(reservation);
+    }
+
+    // ============== changeStatus ==============
+
+    @Test
+    void changeStatus_adminApproves_success() {
+        UpdateStatusRequest request = new UpdateStatusRequest(ReservationStatus.APPROVED);
+        User owner = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
+        User admin = User.builder().id(99L).name("Admin").email("admin@admin.com")
+                .role(UserRole.ADMIN).build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+
+        Reservation reservation = Reservation.builder()
+                .id(1L).user(owner).room(room)
                 .status(ReservationStatus.PENDING)
                 .build();
 
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByEmail("admin@admin.com")).thenReturn(Optional.of(admin));
 
-        ReservationResponse response = reservationService.changeStatus(1L, request);
+        ReservationResponse response = reservationService.changeStatus(1L, request, "admin@admin.com");
 
         assertEquals(ReservationStatus.APPROVED, reservation.getStatus());
         assertEquals(ReservationStatus.APPROVED, response.status());
-        assertEquals(1L, response.id());
         verify(eventPublisher).publishEvent(any(ReservationStatusChangedEvent.class));
     }
 
     @Test
-    void changeStatus_pendingToCancelled_success(){
-        UpdateStatusRequest request = new UpdateStatusRequest(ReservationStatus.CANCELLED);
-        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+    void changeStatus_userCannotApprove_throwsAccessDenied() {
+        UpdateStatusRequest request = new UpdateStatusRequest(ReservationStatus.APPROVED);
+        User owner = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
         Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
 
-        Reservation reservation =  Reservation.builder()
-                .id(1L)
-                .user(user)
-                .room(room)
+        Reservation reservation = Reservation.builder()
+                .id(1L).user(owner).room(room)
                 .status(ReservationStatus.PENDING)
                 .build();
 
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByEmail("ivan@email.com")).thenReturn(Optional.of(owner));
 
-        ReservationResponse response = reservationService.changeStatus(1L, request);
+        // Даже владелец-USER не может одобрять — только админ
+        assertThrows(AccessDeniedException.class,
+                () -> reservationService.changeStatus(1L, request, "ivan@email.com"));
 
-        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
-        assertEquals(ReservationStatus.CANCELLED, response.status());
-        assertEquals(1L, response.id());
-        verify(eventPublisher).publishEvent(any(ReservationStatusChangedEvent.class));
+        assertEquals(ReservationStatus.PENDING, reservation.getStatus());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
-    void changeStatus_approvedToCancelled_success(){
+    void changeStatus_ownerCancelsOwn_success() {
         UpdateStatusRequest request = new UpdateStatusRequest(ReservationStatus.CANCELLED);
-        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+        User owner = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
         Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
 
-        Reservation reservation =  Reservation.builder()
-                .id(1L)
-                .user(user)
-                .room(room)
-                .status(ReservationStatus.APPROVED)
+        Reservation reservation = Reservation.builder()
+                .id(1L).user(owner).room(room)
+                .status(ReservationStatus.PENDING)
                 .build();
 
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByEmail("ivan@email.com")).thenReturn(Optional.of(owner));
 
-        ReservationResponse response = reservationService.changeStatus(1L, request);
+        ReservationResponse response = reservationService.changeStatus(1L, request, "ivan@email.com");
 
         assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
         assertEquals(ReservationStatus.CANCELLED, response.status());
-        assertEquals(1L, response.id());
         verify(eventPublisher).publishEvent(any(ReservationStatusChangedEvent.class));
     }
 
     @Test
-    void changeStatus_cancelledToApproved_throws(){
-        UpdateStatusRequest request = new UpdateStatusRequest(ReservationStatus.APPROVED);
-        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com").build();
+    void changeStatus_userCannotCancelOthers_throwsAccessDenied() {
+        UpdateStatusRequest request = new UpdateStatusRequest(ReservationStatus.CANCELLED);
+        User owner = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
+        User otherUser = User.builder().id(99L).name("Other").email("other@email.com")
+                .role(UserRole.USER).build();
         Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
 
-        Reservation reservation =  Reservation.builder()
-                .id(1L)
-                .user(user)
-                .room(room)
+        Reservation reservation = Reservation.builder()
+                .id(1L).user(owner).room(room)
+                .status(ReservationStatus.PENDING)
+                .build();
+
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(userRepository.findByEmail("other@email.com")).thenReturn(Optional.of(otherUser));
+
+        assertThrows(AccessDeniedException.class,
+                () -> reservationService.changeStatus(1L, request, "other@email.com"));
+
+        assertEquals(ReservationStatus.PENDING, reservation.getStatus());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void changeStatus_invalidTransition_throwsFirst() {
+        // CANCELLED → APPROVED запрещен FSM'ом ДО проверки ролей
+        UpdateStatusRequest request = new UpdateStatusRequest(ReservationStatus.APPROVED);
+        User user = User.builder().id(1L).name("Ivan").email("ivan@email.com")
+                .role(UserRole.USER).build();
+        Room room = Room.builder().id(2L).name("luxury").capacity(2).build();
+
+        Reservation reservation = Reservation.builder()
+                .id(1L).user(user).room(room)
                 .status(ReservationStatus.CANCELLED)
                 .build();
 
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
 
-        assertThrows(InvalidStatusTransitionException.class, ()-> reservationService.changeStatus(1L, request));
+        assertThrows(InvalidStatusTransitionException.class,
+                () -> reservationService.changeStatus(1L, request, "ivan@email.com"));
 
         assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
         verify(eventPublisher, never()).publishEvent(any());
     }
 
+    // ============== getRoomStats ==============
+
     @Test
-    void getRoomStats_success(){
+    void getRoomStats_success() {
         LocalDate from = LocalDate.of(2026, 12, 1);
         LocalDate to = LocalDate.of(2026, 12, 31);
 
         when(reservationRepository.getStats(from, to))
                 .thenReturn(List.of(new RoomStatsResponse(1L, "luxury", 3L)));
 
-        List<RoomStatsResponse> result = reservationService.getStats(from, to);  // WHEN через сервис!
+        List<RoomStatsResponse> result = reservationService.getStats(from, to);
 
         assertEquals(1, result.size());
         assertEquals("luxury", result.get(0).roomName());

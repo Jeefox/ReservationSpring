@@ -37,15 +37,21 @@ public class SecurityConfig {
 
                 // Правила доступа
                 .authorizeHttpRequests(auth -> auth
-                        // Публичные эндпоинты (регистрация/логин)
+                        // Публичные
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
-                        // Swagger в dev (чтобы UI работал без токена)
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                        // H2-консоль в dev (если используешь)
                         .requestMatchers("/h2-console/**").permitAll()
-                        // Всё остальное под /api — требует аутентификации
+
+                        // Админские (СПЕЦИФИЧНЫЕ — ВПЕРЕД!)
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/rooms/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/rooms/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/rooms/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasRole("ADMIN")
+
+                        // Общие (В КОНЦЕ!)
                         .requestMatchers("/api/**").authenticated()
-                        // Прочее — закрываем
+
+                        // Всё прочее
                         .anyRequest().denyAll()
                 )
 

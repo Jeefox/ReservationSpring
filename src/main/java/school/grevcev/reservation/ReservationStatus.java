@@ -12,4 +12,7 @@ public enum ReservationStatus {
             case CANCELLED -> false;
         };
     }
+    public static boolean isApproverRequired(ReservationStatus from, ReservationStatus to) {
+        return to == APPROVED;   // APPROVED — только для админа
+    }
 }

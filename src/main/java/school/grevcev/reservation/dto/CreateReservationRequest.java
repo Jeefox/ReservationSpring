@@ -8,17 +8,9 @@ import school.grevcev.reservation.ReservationStatus;
 import java.time.LocalDate;
 
 public record CreateReservationRequest(
-        @NotNull
-        Long userId,
-        @NotNull
-        Long roomId,
-        @NotNull
-        @FutureOrPresent
-        LocalDate startDate,
-        @NotNull
-        LocalDate endDate,
-        @NotNull
-        ReservationStatus status) {
+        @NotNull Long roomId,
+        @NotNull@FutureOrPresent LocalDate startDate,
+        @NotNull LocalDate endDate) {
     @AssertTrue
     public boolean isDateValid(){
         if(startDate ==null || endDate ==null) return true;

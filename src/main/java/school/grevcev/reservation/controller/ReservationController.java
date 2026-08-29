@@ -7,12 +7,13 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import school.grevcev.reservation.ReservationStatus;
 import school.grevcev.reservation.dto.*;
 import school.grevcev.reservation.service.ReservationService;
-import school.grevcev.reservation.service.RoomService;
 
 import java.net.URI;
 import java.time.LocalDate;
@@ -24,11 +25,9 @@ import java.util.List;
 public class ReservationController {
 
     private final ReservationService reservationService;
-    private final RoomService roomService;
 
-    public ReservationController(ReservationService reservationService,  RoomService roomService) {
+    public ReservationController(ReservationService reservationService) {
         this.reservationService = reservationService;
-        this.roomService = roomService;
     }
 
     @Operation(
@@ -44,11 +43,13 @@ public class ReservationController {
     @ApiResponse(responseCode = "404", description = "Пользователь или комната не найдены")
     @ApiResponse(responseCode = "409", description = "Комната уже забронирована на указанные даты")
     @PostMapping
-    public ResponseEntity<ReservationResponse> createReservation(@Valid @RequestBody CreateReservationRequest createReservationRequest) {
-        ReservationResponse created = reservationService.createReservation(createReservationRequest);
+    public ResponseEntity<ReservationResponse> createReservation(@Valid @RequestBody CreateReservationRequest request,
+                                                                 @AuthenticationPrincipal UserDetails userDetails) {
+        String email = userDetails.getUsername();   // ← это sub из твоего JWT!
+        ReservationResponse response = reservationService.createReservation(request, email);
         return ResponseEntity
-                .created(buildLocation(created.id()))
-                .body(created);
+                .created(buildLocation(response.id()))
+                .body(response);
     }
 
     private URI buildLocation(Long id) {
@@ -81,8 +82,11 @@ public class ReservationController {
     @ApiResponse(responseCode = "404", description = "Бронь, пользователь или комната не найдены")
     @ApiResponse(responseCode = "409", description = "Новые даты пересекаются с активной бронью комнаты")
     @PutMapping("/{id}")
-    public ReservationResponse updateReservation(@PathVariable Long id, @Valid @RequestBody UpdateReservationRequest reservation) {
-        return reservationService.updateReservation(id, reservation);
+    public ReservationResponse updateReservation(@PathVariable Long id,
+                                                 @Valid @RequestBody UpdateReservationRequest request,
+                                                 @AuthenticationPrincipal UserDetails userDetails) {
+        String email = userDetails.getUsername();
+        return reservationService.updateReservation(id, request, email);
     }
 
     @Operation(
@@ -92,8 +96,10 @@ public class ReservationController {
     @ApiResponse(responseCode = "204", description = "Бронь удалена")
     @ApiResponse(responseCode = "404", description = "Бронь не найдена")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteReservationById(@PathVariable Long id) {
-        reservationService.deleteReservationById(id);
+    public ResponseEntity<Void> deleteReservationById(@PathVariable Long id,
+                                                      @AuthenticationPrincipal UserDetails userDetails) {
+        String email = userDetails.getUsername();
+        reservationService.deleteReservationById(id, email);
         return ResponseEntity.noContent().build();
     }
 
@@ -113,9 +119,10 @@ public class ReservationController {
             @RequestParam(required = false) ReservationStatus status,
             @RequestParam(required = false) LocalDate from,
             @RequestParam(required = false) LocalDate to,
-            Pageable pageable
-            ) {
-        return PageResponse.from(reservationService.search(userId, roomId, status, from, to, pageable));
+            Pageable pageable,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String email = userDetails.getUsername();
+        return PageResponse.from(reservationService.search(userId, roomId, status, from, to, pageable, email));
     }
 
     @Operation(
@@ -135,9 +142,12 @@ public class ReservationController {
     @ApiResponse(responseCode = "404", description = "Бронь не найдена")
     @ApiResponse(responseCode = "409", description = "Переход состояния запрещён правилами FSM")
     @PatchMapping("/{id}/status")
-    public ResponseEntity<ReservationResponse> updateReservationStatus(@PathVariable Long id, @Valid @RequestBody UpdateStatusRequest request) {
-        ReservationResponse response = reservationService.changeStatus(id, request);
-        return ResponseEntity.status(200).body(response);
+    public ResponseEntity<ReservationResponse> updateReservationStatus(@PathVariable Long id,
+                                                                       @Valid @RequestBody UpdateStatusRequest request,
+                                                                       @AuthenticationPrincipal UserDetails userDetails) {
+        String email = userDetails.getUsername();
+        ReservationResponse response = reservationService.changeStatus(id, request, email);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/stats")
